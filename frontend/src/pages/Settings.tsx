@@ -100,7 +100,10 @@ const TAB_ITEMS = [
       {
         title: 'MoeMail',
         desc: '自动注册账号并生成临时邮箱',
-        fields: [{ key: 'moemail_api_url', label: 'API URL', placeholder: 'https://sall.cc' }],
+        fields: [
+          { key: 'moemail_api_url', label: 'API URL', placeholder: 'https://sall.cc' },
+          { key: 'moemail_api_key', label: 'API Key', secret: true },
+        ],
       },
       {
         title: 'SkyMail',

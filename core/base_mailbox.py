@@ -245,6 +245,7 @@ def create_mailbox(
     elif provider == "moemail":
         return MoeMailMailbox(
             api_url=extra.get("moemail_api_url", "https://sall.cc"),
+            api_key=extra.get("moemail_api_key", ""),
             proxy=proxy,
         )
     elif provider == "maliapi":
@@ -1899,11 +1900,19 @@ class CFWorkerMailbox(BaseMailbox):
 class MoeMailMailbox(BaseMailbox):
     """MoeMail (sall.cc) 邮箱服务 - 自动注册账号并生成临时邮箱"""
 
-    def __init__(self, api_url: str = "https://sall.cc", proxy: str = None):
+    def __init__(
+        self, api_url: str = "https://sall.cc", api_key: str = "", proxy: str = None
+    ):
         self.api = api_url.rstrip("/")
+        self.api_key = str(api_key or "").strip()
         self.proxy = build_requests_proxy_config(proxy)
         self._session_token = None
         self._email = None
+
+    def _api_headers(self) -> dict:
+        if not self.api_key:
+            return {}
+        return {"X-API-Key": self.api_key}
 
     def _register_and_login(self) -> str:
         import requests, random, string
@@ -1914,6 +1923,7 @@ class MoeMailMailbox(BaseMailbox):
         s.headers.update(
             {"user-agent": ua, "origin": self.api, "referer": f"{self.api}/zh-CN/login"}
         )
+        s.headers.update(self._api_headers())
         # 注册
         username = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
         password = "Test" + "".join(random.choices(string.digits, k=8)) + "!"
@@ -1954,7 +1964,9 @@ class MoeMailMailbox(BaseMailbox):
         # 获取可用域名列表，随机选一个
         domain = "sall.cc"
         try:
-            cfg_r = self._session.get(f"{self.api}/api/config", timeout=10)
+            cfg_r = self._session.get(
+                f"{self.api}/api/config", headers=self._api_headers(), timeout=10
+            )
             domains = [
                 d.strip()
                 for d in cfg_r.json().get("emailDomains", "sall.cc").split(",")
@@ -1966,6 +1978,7 @@ class MoeMailMailbox(BaseMailbox):
             pass
         r = self._session.post(
             f"{self.api}/api/emails/generate",
+            headers=self._api_headers(),
             json={"name": name, "domain": domain, "expiryTime": 86400000},
             timeout=15,
         )
@@ -1984,7 +1997,9 @@ class MoeMailMailbox(BaseMailbox):
     def get_current_ids(self, account: MailboxAccount) -> set:
         try:
             r = self._session.get(
-                f"{self.api}/api/emails/{account.account_id}", timeout=10
+                f"{self.api}/api/emails/{account.account_id}",
+                headers=self._api_headers(),
+                timeout=10,
             )
             return {str(m.get("id", "")) for m in r.json().get("messages", [])}
         except Exception:
@@ -2006,7 +2021,9 @@ class MoeMailMailbox(BaseMailbox):
         def poll_once() -> Optional[str]:
             try:
                 r = self._session.get(
-                    f"{self.api}/api/emails/{account.account_id}", timeout=10
+                    f"{self.api}/api/emails/{account.account_id}",
+                    headers=self._api_headers(),
+                    timeout=10,
                 )
                 msgs = r.json().get("messages", [])
                 for msg in msgs:

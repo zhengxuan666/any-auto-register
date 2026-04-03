@@ -22,6 +22,7 @@ CONFIG_KEYS = [
     "freemail_username",
     "freemail_password",
     "moemail_api_url",
+    "moemail_api_key",
     "skymail_api_base",
     "skymail_token",
     "skymail_domain",
